@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.log
+server.log
+data/examples.json
+data/sources/
+data/results/
+data/source_867836.txt
+backend/write_pairs.py
+backend/build_examples.py
+.DS_Store

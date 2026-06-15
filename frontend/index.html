@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI降重工具</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f5; color: #333; min-height: 100vh;
+  }
+  .header {
+    background: #fff; border-bottom: 1px solid #e0e0e0;
+    padding: 16px 24px; display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header .badge { font-size: 12px; background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 12px; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .config-bar {
+    background: #fff; border-radius: 8px; padding: 16px 20px;
+    margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: end;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .config-group { display: flex; flex-direction: column; gap: 4px; }
+  .config-group label { font-size: 12px; color: #888; font-weight: 500; }
+  .config-group input, .config-group select {
+    padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;
+    outline: none; transition: border-color .2s;
+  }
+  .config-group input:focus, .config-group select:focus { border-color: #1976d2; }
+  .config-group input[type="password"] { width: 260px; }
+  .config-group select { width: 180px; }
+
+  .slider-group { min-width: 200px; }
+  .slider-group .slider-label { display: flex; justify-content: space-between; font-size: 12px; color: #888; }
+  .slider-group input[type="range"] { width: 100%; accent-color: #1976d2; }
+
+  .main-area { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; min-height: 400px; }
+  .panel {
+    background: #fff; border-radius: 8px; padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    display: flex; flex-direction: column;
+  }
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+  }
+  .panel-header h2 { font-size: 14px; font-weight: 600; color: #555; }
+  .panel-header .count { font-size: 11px; color: #aaa; }
+  textarea {
+    flex: 1; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px;
+    font-size: 13px; line-height: 1.7; resize: none; outline: none; font-family: inherit;
+    min-height: 350px; transition: border-color .2s;
+  }
+  textarea:focus { border-color: #1976d2; }
+  textarea:read-only { background: #fafafa; cursor: default; }
+  .divider-area {
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px;
+  }
+  .btn {
+    padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;
+    font-weight: 500; transition: all .2s;
+  }
+  .btn-primary { background: #1976d2; color: #fff; width: 120px; }
+  .btn-primary:hover { background: #1565c0; }
+  .btn-primary:disabled { background: #bbb; cursor: not-allowed; }
+  .btn-secondary { background: #f5f5f5; color: #666; font-size: 12px; padding: 6px 12px; }
+
+  .stats { margin-top: 12px; font-size: 12px; color: #aaa; text-align: center; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 10px 24px; border-radius: 8px; font-size: 13px; color: #fff; z-index: 100;
+    transition: opacity .3s; opacity: 0; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.error { background: #d32f2f; }
+  .toast.success { background: #2e7d32; }
+
+  .comparison { display: none; margin-top: 24px; }
+  .comparison.active { display: block; }
+  .comparison h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+  .diff-view { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .diff-panel {
+    background: #fff; border-radius: 8px; padding: 16px;
+    font-size: 12px; line-height: 1.8; white-space: pre-wrap;
+    max-height: 500px; overflow-y: auto;
+    border: 1px solid #e0e0e0;
+  }
+  .diff-panel.original { border-left: 3px solid #1976d2; }
+  .diff-panel.rewritten { border-left: 3px solid #2e7d32; }
+  .diff-label { font-size: 11px; font-weight: 600; margin-bottom: 8px; color: #888; }
+
+  /* Example Management */
+  .examples-section {
+    background: #fff; border-radius: 8px; padding: 20px; margin-top: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .examples-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+  }
+  .examples-header h3 { font-size: 16px; font-weight: 600; }
+  .examples-header .badge { margin-left: 8px; }
+  .add-example-form {
+    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .add-grid label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
+  .add-grid textarea {
+    width: 100%; height: 180px; border: 1px solid #ddd; border-radius: 6px;
+    padding: 10px; font-size: 12px; line-height: 1.6; resize: vertical;
+    font-family: inherit; outline: none;
+  }
+  .add-grid textarea:focus { border-color: #1976d2; }
+  .add-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .examples-list .example-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-bottom: 1px solid #f0f0f0;
+    transition: background .15s;
+  }
+  .examples-list .example-item:hover { background: #fafafa; }
+  .example-item .ex-info { flex: 1; }
+  .example-item .ex-id { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .example-item .ex-preview { font-size: 11px; color: #888; line-height: 1.5; }
+  .example-item .ex-meta { font-size: 11px; color: #aaa; margin-top: 4px; }
+  .example-item .ex-del {
+    background: none; border: none; color: #d32f2f; cursor: pointer; font-size: 12px;
+    padding: 4px 8px; border-radius: 4px; opacity: 0.5; transition: opacity .2s;
+  }
+  .example-item .ex-del:hover { opacity: 1; background: #ffebee; }
+
+  @media (max-width: 768px) {
+    .main-area { grid-template-columns: 1fr; }
+    .divider-area { flex-direction: row; }
+    .config-bar { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔧 AI降重工具</h1>
+  <span class="badge" id="exampleBadge">已加载 0 个示例</span>
+</div>
+
+<div class="container">
+
+  <!-- Config Bar -->
+  <div class="config-bar">
+    <div class="config-group">
+      <label>API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-xxxxxxxx" />
+    </div>
+    <div class="config-group">
+      <label>API 地址</label>
+      <input type="text" id="apiBase" value="https://api.deepseek.com" />
+    </div>
+    <div class="config-group">
+      <label>模型</label>
+      <select id="model">
+        <option value="deepseek-chat">DeepSeek Chat</option>
+        <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+        <option value="qwen-turbo">通义千问 Turbo</option>
+        <option value="qwen-plus">通义千问 Plus</option>
+      </select>
+    </div>
+    <div class="config-group slider-group">
+      <div class="slider-label"><span>降重度</span><span id="intensityVal">3 - 中等</span></div>
+      <input type="range" id="intensity" min="1" max="5" value="3" />
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-area">
+    <div class="panel">
+      <div class="panel-header">
+        <h2>📝 原文</h2>
+        <span class="count" id="srcCount">0 字</span>
+      </div>
+      <textarea id="sourceText" placeholder="把需要降重的文章粘贴到这里..."></textarea>
+    </div>
+
+    <div class="divider-area">
+      <button class="btn btn-primary" id="rewriteBtn" onclick="doRewrite()">开始降重</button>
+      <button class="btn btn-secondary" id="compareBtn" onclick="toggleCompare()" disabled>预览对比</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>✨ 降重后</h2>
+        <span class="count" id="resCount">0 字</span>
+      </div>
+      <textarea id="resultText" readonly placeholder="降重结果将在这里显示..."></textarea>
+      <div class="stats" id="stats"></div>
+    </div>
+  </div>
+
+  <!-- Example Management -->
+  <div class="examples-section" id="examplesSection">
+    <div class="examples-header">
+      <h3>📚 示例管理 <span class="badge" id="examplesCount">8 个</span></h3>
+      <button class="btn btn-secondary" onclick="toggleAddExample()">+ 添加新示例</button>
+    </div>
+
+    <!-- Add new example form -->
+    <div class="add-example-form" id="addExampleForm" style="display:none">
+      <div class="add-grid">
+        <div>
+          <label>原文</label>
+          <textarea id="newSource" placeholder="粘贴原始版本..."></textarea>
+        </div>
+        <div>
+          <label>降重后</label>
+          <textarea id="newResult" placeholder="粘贴降重后版本..."></textarea>
+        </div>
+      </div>
+      <div class="add-actions">
+        <input type="text" id="newId" placeholder="标识（可选，自动生成）" style="flex:1; padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:13px;" />
+        <button class="btn btn-primary" onclick="saveExample()">保存为参考示例</button>
+        <button class="btn btn-secondary" onclick="toggleAddExample()">取消</button>
+      </div>
+    </div>
+
+    <!-- Existing examples list -->
+    <div class="examples-list" id="examplesList">
+      <div style="font-size:13px;color:#aaa;text-align:center;padding:20px;">加载中...</div>
+    </div>
+  </div>
+
+  <!-- Comparison -->
+  <div class="comparison" id="comparison">
+    <h3>📊 原文 vs 降重后 对比</h3>
+    <div class="diff-view">
+      <div>
+        <div class="diff-label">📝 原文</div>
+        <div class="diff-panel original" id="diffSource"></div>
+      </div>
+      <div>
+        <div class="diff-label">✨ 降重后</div>
+        <div class="diff-panel rewritten" id="diffResult"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Init ───────────────────────────────────────────────────────
+const apiKeyEl = document.getElementById('apiKey');
+const sourceEl = document.getElementById('sourceText');
+const resultEl = document.getElementById('resultText');
+const compareBtn = document.getElementById('compareBtn');
+const comparisonEl = document.getElementById('comparison');
+
+document.getElementById('intensity').addEventListener('input', e => {
+  const labels = {1:'1 - 轻度',2:'2 - 偏轻',3:'3 - 中等',4:'4 - 偏重',5:'5 - 深度'};
+  document.getElementById('intensityVal').textContent = labels[e.target.value] || '3';
+});
+
+sourceEl.addEventListener('input', () => {
+  document.getElementById('srcCount').textContent = sourceEl.value.length + ' 字';
+});
+
+resultEl.addEventListener('input', () => {
+  document.getElementById('resCount').textContent = resultEl.value.length + ' 字';
+});
+
+// Load saved config
+['apiKey','apiBase','model','intensity'].forEach(k => {
+  const v = localStorage.getItem('downgrade_' + k);
+  if (v) document.getElementById(k).value = v;
+});
+// Update count on load
+document.getElementById('srcCount').textContent = sourceEl.value.length + ' 字';
+
+// Check status
+fetch('/api/status')
+  .then(r => r.json())
+  .then(d => {
+    document.getElementById('exampleBadge').textContent = '已加载 ' + d.examples_count + ' 个示例';
+  })
+  .catch(() => {});
+
+// ── Rewrite ────────────────────────────────────────────────────
+async function doRewrite() {
+  const btn = document.getElementById('rewriteBtn');
+  const text = sourceEl.value.trim();
+  const apiKey = apiKeyEl.value.trim();
+  const apiBase = document.getElementById('apiBase').value.trim();
+  const model = document.getElementById('model').value;
+  const intensity = document.getElementById('intensity').value;
+
+  if (!text) { toast('请先粘贴要降重的文章', 'error'); return; }
+  if (!apiKey) { toast('请填写 API Key', 'error'); return; }
+
+  // Save config
+  localStorage.setItem('downgrade_apiKey', apiKey);
+  localStorage.setItem('downgrade_apiBase', apiBase);
+  localStorage.setItem('downgrade_model', model);
+  localStorage.setItem('downgrade_intensity', intensity);
+
+  btn.disabled = true;
+  btn.textContent = '处理中...';
+  resultEl.value = '';
+  document.getElementById('resCount').textContent = '0 字';
+  document.getElementById('stats').textContent = '';
+
+  try {
+    const res = await fetch('/api/rewrite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, api_key: apiKey, api_base: apiBase, model, intensity })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      toast('错误：' + data.error, 'error');
+    } else {
+      resultEl.value = data.result;
+      document.getElementById('resCount').textContent = data.result.length + ' 字';
+      const srcLen = text.length;
+      const resLen = data.result.length;
+      const diff = resLen - srcLen;
+      const pct = ((Math.abs(diff) / srcLen) * 100).toFixed(1);
+      document.getElementById('stats').textContent =
+        '字数变化：' + (diff >= 0 ? '+' : '') + diff + '（' + (diff >= 0 ? '+' : '') + pct + '%）' +
+        (data.usage?.tokens ? ' | Token用量：' + data.usage.tokens : '');
+      compareBtn.disabled = false;
+      toast('降重完成 ✅', 'success');
+    }
+  } catch (e) {
+    toast('请求失败：' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '开始降重';
+  }
+}
+
+// ── Compare ────────────────────────────────────────────────────
+function toggleCompare() {
+  const active = comparisonEl.classList.toggle('active');
+  if (active) {
+    document.getElementById('diffSource').textContent = sourceEl.value;
+    document.getElementById('diffResult').textContent = resultEl.value;
+    comparisonEl.scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+// ── Example Management ────────────────────────────────────────
+
+fetch('/api/examples/list')
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) renderExamples(d.examples);
+    document.getElementById('examplesCount').textContent = d.count + ' 个';
+    document.getElementById('exampleBadge').textContent = '已加载 ' + d.count + ' 个示例';
+  })
+  .catch(() => {});
+
+function renderExamples(examples) {
+  const el = document.getElementById('examplesList');
+  if (!examples.length) {
+    el.innerHTML = '<div style="font-size:13px;color:#aaa;text-align:center;padding:20px;">暂无参考示例，点击上方按钮添加</div>';
+    return;
+  }
+  el.innerHTML = examples.map(ex => `
+    <div class="example-item">
+      <div class="ex-info">
+        <div class="ex-id">${esc(ex.id)}</div>
+        <div class="ex-preview">📝 原文：${esc(ex.source_preview)}</div>
+        <div class="ex-preview">✨ 降后：${esc(ex.result_preview)}</div>
+        <div class="ex-meta">${ex.source_length} 字 → ${ex.result_length} 字</div>
+      </div>
+      <button class="ex-del" onclick="deleteExample('${esc(ex.id)}')">删除</button>
+    </div>
+  `).join('');
+}
+
+function toggleAddExample() {
+  const form = document.getElementById('addExampleForm');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  if (form.style.display === 'block') {
+    document.getElementById('newSource').focus();
+  }
+}
+
+async function saveExample() {
+  const source = document.getElementById('newSource').value.trim();
+  const result = document.getElementById('newResult').value.trim();
+  const id = document.getElementById('newId').value.trim();
+
+  if (!source) { toast('请填写原文', 'error'); return; }
+  if (!result) { toast('请填写降重后内容', 'error'); return; }
+
+  try {
+    const res = await fetch('/api/examples/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source, result, id: id || undefined })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      toast('保存失败：' + data.error, 'error');
+    } else {
+      toast('示例已保存 ✅', 'success');
+      document.getElementById('newSource').value = '';
+      document.getElementById('newResult').value = '';
+      document.getElementById('newId').value = '';
+      toggleAddExample();
+      // Refresh list
+      const listRes = await fetch('/api/examples/list');
+      const listData = await listRes.json();
+      if (listData.ok) {
+        renderExamples(listData.examples);
+        document.getElementById('examplesCount').textContent = listData.count + ' 个';
+        document.getElementById('exampleBadge').textContent = '已加载 ' + listData.count + ' 个示例';
+      }
+    }
+  } catch (e) {
+    toast('请求失败：' + e.message, 'error');
+  }
+}
+
+async function deleteExample(id) {
+  if (!confirm('确定删除示例 "' + id + '" 吗？')) return;
+  try {
+    const res = await fetch('/api/examples/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      toast('删除失败：' + data.error, 'error');
+    } else {
+      toast('已删除 ✅', 'success');
+      const listRes = await fetch('/api/examples/list');
+      const listData = await listRes.json();
+      if (listData.ok) {
+        renderExamples(listData.examples);
+        document.getElementById('examplesCount').textContent = listData.count + ' 个';
+        document.getElementById('exampleBadge').textContent = '已加载 ' + listData.count + ' 个示例';
+      }
+    }
+  } catch (e) {
+    toast('请求失败：' + e.message, 'error');
+  }
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
